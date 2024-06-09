@@ -1,0 +1,53 @@
+name: WebOverview
+on:
+  # Schedule daily updates
+  schedule: [{cron: "0 0 1 * *"}]
+  # (optional) Run workflow manually
+  workflow_dispatch:
+  # (optional) Run workflow when pushing on master/main
+  push: {branches: ["master", "main"]}
+jobs:
+  github-metrics:
+    runs-on: ubuntu-latest
+    environment: 
+      name: production
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Website Screenshot
+        uses: lowlighter/metrics@latest
+        with:
+          output_action: none
+          filename: metrics.plugin.pagespeed.screenshot.svg
+          token: NOT_NEEDED
+          base: ""
+          plugin_pagespeed: yes
+          plugin_pagespeed_screenshot: yes
+          plugin_pagespeed_token: ${{ secrets.PAGESPEED_TOKEN }}
+          plugin_pagespeed_url: https://arka.web.id
+      - name: Metrics Mover
+        if: ${{ success() || failure() }}
+        run: |
+          set +e
+          mkdir ./metrics
+          ls -la
+          sudo mv /metrics_renders/* ./metrics/
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git pull
+          git add --all
+          git commit -m "chore: push metrics"
+          git push
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: 🗑 Delete deployment
+        uses: strumwolf/delete-deployment-environment@v2
+        with:
+          token: ${{ secrets.METRICS_TOKEN }}
+          environment: production
+          onlyRemoveDeployments: true
